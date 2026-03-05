@@ -1,0 +1,66 @@
+# Tutorial Validator - Docker Compose Configuration
+# Runs SQL Server and Executor container for tutorial validation
+
+services:
+  # SQL Server database for ABP tutorials
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: tutorial-validator-sqlserver
+    environment:
+      - ACCEPT_EULA=Y
+      - MSSQL_SA_PASSWORD=YourStrong!Password123
+      - MSSQL_PID=Developer
+    ports:
+      - "1433:1433"
+    volumes:
+      - sqlserver-data:/var/opt/mssql
+    healthcheck:
+      test: /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "YourStrong!Password123" -C -Q "SELECT 1" || exit 1
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - validator-network
+
+  # Executor container - validates ABP tutorials
+  executor:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: tutorial-validator-executor
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+    volumes:
+      # Mount output directory for testplan.json input and results output
+      - ${OUTPUT_PATH:-../output}:/output
+      # Working space for ABP projects (ephemeral)
+      - executor-workspace:/workspace
+    environment:
+      # AI Configuration (passed from host)
+      - AZURE_OPENAI_ENDPOINT=${AZURE_OPENAI_ENDPOINT:-}
+      - AZURE_OPENAI_API_KEY=${AZURE_OPENAI_API_KEY:-}
+      - AZURE_OPENAI_DEPLOYMENT=${AZURE_OPENAI_DEPLOYMENT:-gpt-4o}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o}
+      - AI_PROVIDER=${AI_PROVIDER:-}
+      # Database connection string for SQL Server
+      - ConnectionStrings__Default=Server=sqlserver;Database=TutorialValidatorTest;User=sa;Password=YourStrong!Password123;TrustServerCertificate=true;Encrypt=false
+      # Executor configuration
+      - EXECUTOR_WORKDIR=/workspace
+    networks:
+      - validator-network
+    # Override default command if needed via command line
+    # command: ["run", "--input", "/output/testplan.json", "--workdir", "/workspace", "--output", "/output/results"]
+
+volumes:
+  sqlserver-data:
+    name: tutorial-validator-sqlserver-data
+  executor-workspace:
+    name: tutorial-validator-workspace
+
+networks:
+  validator-network:
+    name: tutorial-validator-network
+    driver: bridge

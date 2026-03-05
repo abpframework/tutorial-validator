@@ -1,0 +1,95 @@
+{
+  "tutorialName": "Book Store Tutorial",
+  "tutorialUrl": "https://abp.io/docs/latest/tutorials/book-store?UI=MVC&DB=EF",
+  "abpVersion": "10.0",
+  "configuration": {
+    "ui": "mvc",
+    "database": "ef",
+    "dbProvider": "sqlserver"
+  },
+  "steps": [
+    {
+      "type": "command",
+      "stepId": 1,
+      "description": "Create new ABP project",
+      "command": "abp new BookStore -u mvc -d ef",
+      "expects": {
+        "exitCode": 0,
+        "creates": ["BookStore"]
+      }
+    },
+    {
+      "type": "file_operation",
+      "stepId": 2,
+      "description": "Create Book entity file",
+      "operation": "create",
+      "path": "src/BookStore.Domain/Books/Book.cs",
+      "entityType": "file",
+      "content": "using System;\nusing Volo.Abp.Domain.Entities.Auditing;\n\nnamespace BookStore.Books;\n\npublic class Book : AuditedAggregateRoot<Guid>\n{\n    public string Name { get; set; }\n    public BookType Type { get; set; }\n    public DateTime PublishDate { get; set; }\n    public float Price { get; set; }\n}"
+    },
+    {
+      "type": "code_change",
+      "stepId": 3,
+      "description": "Add Book DbSet to DbContext",
+      "scope": "infrastructure",
+      "modifications": [
+        {
+          "filePath": "src/BookStore.EntityFrameworkCore/BookStoreDbContext.cs",
+          "searchPattern": "public class BookStoreDbContext",
+          "replaceWith": "public DbSet<Book> Books { get; set; }\n\npublic class BookStoreDbContext"
+        }
+      ]
+    },
+    {
+      "type": "command",
+      "stepId": 4,
+      "description": "Build the solution",
+      "command": "dotnet build",
+      "expects": {
+        "exitCode": 0
+      }
+    },
+    {
+      "type": "expectation",
+      "stepId": 5,
+      "description": "Verify build succeeds",
+      "assertions": [
+        {
+          "kind": "build",
+          "command": "dotnet build",
+          "expectsExitCode": 0
+        }
+      ]
+    },
+    {
+      "type": "command",
+      "stepId": 6,
+      "description": "Run migrations",
+      "command": "dotnet ef database update --project src/BookStore.EntityFrameworkCore",
+      "expects": {
+        "exitCode": 0
+      }
+    },
+    {
+      "type": "expectation",
+      "stepId": 7,
+      "description": "Verify application runs",
+      "assertions": [
+        {
+          "kind": "http",
+          "url": "https://localhost:44321",
+          "method": "GET",
+          "expectsStatus": 200
+        },
+        {
+          "kind": "database",
+          "provider": "ef",
+          "expects": {
+            "migrationsApplied": true,
+            "tablesExist": ["Books", "AppUsers"]
+          }
+        }
+      ]
+    }
+  ]
+}

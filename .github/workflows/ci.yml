@@ -1,0 +1,102 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      tutorial_url:
+        description: 'Tutorial URL to validate'
+        required: true
+        default: 'https://abp.io/docs/latest/tutorials/book-store?UI=MVC&DB=EF'
+      persona:
+        description: 'Developer persona'
+        required: false
+        default: 'senior'
+        type: choice
+        options: [junior, mid, senior]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+          
+      - name: Restore dependencies
+        run: dotnet restore
+        
+      - name: Build solution
+        run: dotnet build --configuration Release --no-restore
+        
+      - name: Run unit tests
+        run: dotnet test --configuration Release --no-build --verbosity normal
+        
+  validate-tutorial:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+          
+      - name: Set up Docker
+        run: |
+          sudo systemctl start docker
+          sudo systemctl enable docker
+          
+      - name: Install ABP CLI
+        run: dotnet tool install -g Volo.Abp.Studio.Cli
+        
+      - name: Create output directory
+        run: mkdir -p output
+        
+      - name: Run validation
+        env:
+          AZURE_OPENAI_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
+          AZURE_OPENAI_ENDPOINT: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          dotnet run --project src/Validator.Orchestrator -- run \
+            --url "${{ github.event.inputs.tutorial_url || 'https://abp.io/docs/latest/tutorials/book-store?UI=MVC&DB=EF' }}" \
+            --persona "${{ github.event.inputs.persona || 'senior' }}" \
+            --output ./output
+            
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: validation-results
+          path: output/
+          
+      - name: Comment PR with results
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = './output/summary.json';
+            
+            if (fs.existsSync(path)) {
+              const summary = JSON.parse(fs.readFileSync(path, 'utf8'));
+              const status = summary.OverallStatus === 'Passed' ? '✅' : '❌';
+              
+              github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: `## Tutorial Validation Results ${status}\n\n**Tutorial:** ${summary.TutorialName}\n**Status:** ${summary.OverallStatus}\n**Duration:** ${summary.Duration}\n\nSee artifacts for detailed results.`
+              });
+            }

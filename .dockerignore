@@ -1,0 +1,58 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# IDE and Editor
+.vs
+.vscode
+.idea
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Build outputs - CRITICAL: exclude Windows obj/bin folders
+**/bin
+**/obj
+**/out
+**/publish
+
+# NuGet
+**/packages
+
+# Test results
+**/TestResults
+**/coverage
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# Samples and output
+samples/
+**/Output/
+**/results/
+output/
+
+# Logs
+*.log
+logs/
+
+# Environment files
+*.env
+*.local
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Cursor/VSCode plans
+.cursor/
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*~
