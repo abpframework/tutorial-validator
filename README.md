@@ -4,172 +4,128 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![.NET](https://img.shields.io/badge/.NET-10-512BD4)](https://dotnet.microsoft.com/download/dotnet/10.0)
 
-An AI-powered automated testing system that validates software documentation tutorials by simulating a real developer following each step.
+TutorialValidator is an AI-powered tool that checks whether a software documentation tutorial actually works. You give it a URL, it scrapes the tutorial, turns every instruction into an executable step, then runs those steps exactly as a developer would — installing packages, writing files, running commands, making HTTP calls, and asserting results. If any step fails, the tutorial has a bug.
 
-If a tutorial step fails, it means the documentation has a bug.
-
-> **Current status:** The system was built and validated against [ABP Framework](https://abp.io) tutorials. The architecture is designed to be tutorial-agnostic — support for general software tutorials (any framework, any stack) is actively being expanded.
-
----
-
-## How It Works
-
-TutorialValidator runs a three-phase pipeline:
-
-```
-Tutorial URL
-    │
-    ▼
-┌──────────────────────────────────┐
-│  Analyst                         │
-│  1. Scrape tutorial pages (HTML) │
-│  2. AI extracts structured steps │
-│  3. Output: testplan.json        │
-└──────────────┬───────────────────┘
-               │ testplan.json
-               ▼
-┌──────────────────────────────────┐
-│  Executor                        │
-│  AI agent simulates a developer  │
-│  Runs commands, writes files,    │
-│  makes HTTP calls, asserts state │
-│  Output: results/ + summary.json │
-└──────────────┬───────────────────┘
-               │ summary.json
-               ▼
-┌──────────────────────────────────┐
-│  Reporter                        │
-│  Sends HTML email report         │
-│  Posts Discord notification      │
-└──────────────────────────────────┘
-```
-
-The Orchestrator coordinates all three phases and manages the Docker environment that isolates tutorial execution.
+It was built to validate [ABP Framework](https://abp.io) tutorials, but the architecture supports any publicly accessible tutorial.
 
 ---
 
 ## Prerequisites
 
-| Tool | Install |
-|---|---|
-| .NET 10 SDK | [dotnet.microsoft.com](https://dotnet.microsoft.com/download/dotnet/10.0) |
-| Docker Desktop | [docker.com/get-started](https://www.docker.com/get-started/) |
-| OpenAI or Azure OpenAI API key | [platform.openai.com](https://platform.openai.com) or Azure portal |
+Before you start, make sure you have the following installed:
 
-> **Tutorial-specific tools:** Some tutorials require additional tooling in the execution environment (e.g., a specific CLI, a database engine, a runtime). The Docker-based execution mode lets you customize the container image to include whatever tools your target tutorials need.
+| Tool | Version | Where to get it |
+|---|---|---|
+| .NET SDK | 10.0 | [dotnet.microsoft.com](https://dotnet.microsoft.com/download/dotnet/10.0) |
+| Docker Desktop | Latest | [docker.com/get-started](https://www.docker.com/get-started/) |
+| OpenAI **or** Azure OpenAI API key | — | [platform.openai.com](https://platform.openai.com) or your Azure portal |
+
+> Docker is required for the default (recommended) execution mode. If you want to run without Docker, see [Running Locally Without Docker](#running-locally-without-docker) below.
 
 ---
 
-## Quick Start
+## Quick Start (Docker — Recommended)
 
-**1. Clone the repository**
+Docker mode runs the tutorial execution inside an isolated container, so nothing being tested affects your machine.
+
+**Step 1 — Clone the repository**
 
 ```bash
 git clone https://github.com/AbpFramework/TutorialValidator.git
 cd TutorialValidator
 ```
 
-**2. Configure environment**
+**Step 2 — Create your environment file**
 
 ```bash
 cp docker/.env.example docker/.env
 ```
 
-Open `docker/.env` and set your API key:
+**Step 3 — Add your API key**
 
+Open `docker/.env` in any text editor and fill in your credentials.
+
+For OpenAI:
 ```env
-# For OpenAI:
 OPENAI_API_KEY=sk-...
-
-# Or for Azure OpenAI:
-# AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com/
-# AZURE_OPENAI_API_KEY=your-key
-# AZURE_OPENAI_DEPLOYMENT=gpt-4o
+OPENAI_MODEL=gpt-5.2
 ```
 
-**3. Run a full validation**
+For Azure OpenAI:
+```env
+AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com/
+AZURE_OPENAI_API_KEY=your-key
+AZURE_OPENAI_DEPLOYMENT=gpt-4o
+AI_PROVIDER=AzureOpenAI
+```
+
+**Step 4 — Run the validation**
 
 ```bash
 dotnet run --project src/Validator.Orchestrator -- run \
-  --url "https://your-docs-site.com/tutorials/getting-started" \
+  --url "https://docs.abp.io/en/abp/latest/Tutorials/Todo/Index" \
   --output ./output
 ```
 
-The example above uses a placeholder URL. Point `--url` at any publicly accessible tutorial page. The Analyst will scrape the page (and linked pages in the same tutorial series) and extract an executable test plan.
+Replace the URL with any tutorial you want to test. The tool will scrape the page and any linked pages in the same tutorial series, then begin execution. The whole process typically takes 10–30 minutes depending on tutorial length and the model you are using.
 
-**4. Inspect results**
+**Step 5 — Review the results**
+
+When the run finishes, your output directory will contain:
 
 ```
 output/
-├── scraped/          # Raw scraped tutorial content
-├── testplan.json     # Structured test plan extracted by the Analyst
-├── results/          # Step-by-step execution results
-├── logs/             # Full execution logs
-└── summary.json      # Pass/fail summary with diagnostics
+├── scraped/                  # Markdown version of the scraped tutorial pages
+├── testplan.json             # Structured list of steps extracted from the tutorial
+├── results/
+│   ├── validation-result.json   # Step-by-step pass/fail results
+│   └── validation-report.json   # Detailed report with diagnostics
+├── logs/                     # Full execution logs
+└── summary.json              # Overall pass/fail summary
 ```
 
-An HTML email report is sent (if email is configured) and a Discord notification is posted (if a webhook is configured).
+Exit code `0` means the tutorial passed. Exit code `1` means at least one step failed.
 
 ---
 
-## Developer Personas
+## Running Locally Without Docker
 
-The Executor simulates a developer at a specific experience level. The persona controls how strictly the agent follows instructions and whether it can self-correct errors.
+If you prefer not to use Docker (for example, if you already have the required tools installed on your machine), you can run everything locally.
 
-| Persona | Technical Knowledge | Framework Knowledge | On Error | Use Case |
-|---|---|---|---|---|
-| `junior` | Basic programming | None | Reports failure immediately | Strictest test — catches even small doc gaps |
-| `mid` | Familiar with the relevant stack | None | Reports failure | Default — realistic new user following the tutorial |
-| `senior` | Expert in the relevant stack | Expert | Self-diagnoses, retries up to 3× | Validates the happy path; notes any fixes needed |
+**Step 1 — Add your API key to appsettings**
 
-Set the persona with `--persona <level>`:
+Open `src/Validator.Orchestrator/appsettings.json` and fill in the `AI` section with your credentials, or set environment variables instead (see [Environment Variables](#environment-variables)).
+
+**Step 2 — Run with the `--local` flag**
 
 ```bash
 dotnet run --project src/Validator.Orchestrator -- run \
-  --url "https://your-docs-site.com/tutorials/getting-started" \
-  --persona senior
+  --url "https://docs.abp.io/en/abp/latest/Tutorials/Todo/Index" \
+  --output ./output \
+  --local
 ```
 
----
-
-## Step Types
-
-The Analyst extracts tutorial content into four structured step types, which the Executor then runs:
-
-| Type | Description | Example |
-|---|---|---|
-| `Command` | CLI command execution | `npm install`, `dotnet build`, `git clone` |
-| `FileOperation` | Create, read, modify, or delete a file or directory | Create a config file in the project root |
-| `CodeChange` | Find-and-replace or semantic code modification in an existing file | Add a method to an existing class |
-| `Expectation` | Assertion — verifies a build, HTTP response, or application state | HTTP GET `/health` returns `200 OK` |
-
-A test plan is a JSON array of these steps. See [`samples/testplan.json`](samples/testplan.json) for a full example (based on an ABP Framework tutorial).
+> **Note:** In local mode, the Executor runs commands directly on your machine. Make sure any tools the tutorial requires (such as the ABP CLI, Node.js, or a database) are already installed.
 
 ---
 
-## Sub-components
+## Running Individual Phases
 
-| Project | Role |
-|---|---|
-| `Validator.Core` | Shared models, enums, and result types used by all other projects |
-| `Validator.Analyst` | Scrapes tutorial HTML, converts to Markdown, uses AI to extract a structured test plan |
-| `Validator.Executor` | AI agent that executes test plan steps inside an isolated working directory |
-| `Validator.Orchestrator` | Top-level CLI: coordinates Analyst → Executor → Reporter, manages Docker lifecycle |
-| `Validator.Reporter` | Formats and sends HTML email reports and Discord notifications |
+You do not have to run the full pipeline every time.
 
----
+**Generate a test plan without executing it (Analyst only)**
 
-## Running Individual Components
-
-### Generate a test plan only (Analyst)
+Useful for inspecting what the AI extracted from the tutorial before you commit to a full run.
 
 ```bash
 dotnet run --project src/Validator.Analyst -- full \
-  --url "https://your-docs-site.com/tutorials/getting-started" \
+  --url "https://docs.abp.io/en/abp/latest/Tutorials/Todo/Index" \
   --output ./output
 ```
 
-### Execute an existing test plan only (Executor)
+**Execute an existing test plan (Executor only)**
+
+If you already have a `testplan.json` — either from a previous Analyst run or hand-crafted — you can execute it directly:
 
 ```bash
 dotnet run --project src/Validator.Executor -- run \
@@ -179,24 +135,7 @@ dotnet run --project src/Validator.Executor -- run \
   --persona mid
 ```
 
-### Full pipeline — local mode (no Docker)
-
-```bash
-dotnet run --project src/Validator.Orchestrator -- run \
-  --url "https://your-docs-site.com/tutorials/getting-started" \
-  --output ./output \
-  --local
-```
-
-### Full pipeline — Docker mode (isolated environment + Executor container)
-
-```bash
-dotnet run --project src/Validator.Orchestrator -- run \
-  --url "https://your-docs-site.com/tutorials/getting-started" \
-  --output ./output
-```
-
-### Run Executor in Docker with an existing test plan
+**Run the Executor in Docker against an existing test plan**
 
 ```bash
 dotnet run --project src/Validator.Orchestrator -- docker-only \
@@ -204,31 +143,40 @@ dotnet run --project src/Validator.Orchestrator -- docker-only \
   --output ./output
 ```
 
-### All Orchestrator options
+---
 
-| Flag | Default | Description |
+## Developer Personas
+
+The `--persona` flag controls how the AI agent behaves when it encounters problems. Think of it as the experience level of the developer following your tutorial.
+
+| Persona | What it simulates | On error |
 |---|---|---|
-| `--url`, `-u` | — | Tutorial URL to validate |
-| `--testplan`, `-t` | — | Path to an existing `testplan.json` |
-| `--skip-analyst` | false | Skip scraping, use an existing test plan |
-| `--output`, `-o` | `./output` | Output directory |
-| `--persona` | `mid` | Developer persona: `junior`, `mid`, `senior` |
-| `--local` | false | Run Executor locally instead of in Docker |
-| `--keep-containers` | false | Keep Docker containers running after completion |
-| `--timeout` | `60` | Timeout in minutes |
-| `--config`, `-c` | — | Path to a custom `appsettings.json` |
+| `junior` | A developer who follows instructions exactly as written, no problem-solving | Stops and reports immediately |
+| `mid` | A developer familiar with the tech stack but new to this framework (default) | Stops and reports immediately |
+| `senior` | An expert who can diagnose and fix issues autonomously | Retries up to 3 times, documents every fix |
+
+```bash
+dotnet run --project src/Validator.Orchestrator -- run \
+  --url "https://docs.abp.io/en/abp/latest/Tutorials/Todo/Index" \
+  --persona senior
+```
+
+Use `junior` or `mid` to find actual documentation gaps. Use `senior` to validate the overall flow and identify which problems are fixable by an experienced developer.
 
 ---
 
-## Configuration Reference
+## Configuration and Options
 
-### `appsettings.json`
+### appsettings.json
+
+The file at `src/Validator.Orchestrator/appsettings.json` controls all default settings. Every value can also be overridden with an environment variable (see [Environment Variables](#environment-variables) below).
 
 ```json
 {
   "AI": {
     "Provider": "OpenAI",
-    "Model": "gpt-4o",
+    "Model": "gpt-5.2",
+    "DeploymentName": "gpt-5.2",
     "ApiKey": ""
   },
   "Docker": {
@@ -241,51 +189,172 @@ dotnet run --project src/Validator.Orchestrator -- docker-only \
     "TimeoutMinutes": 60
   },
   "Email": {
-    "Enabled": false,
+    "Enabled": true,
     "SmtpHost": "localhost",
-    "SmtpPort": 587,
-    "UseSsl": true,
+    "SmtpPort": 2525,
+    "UseSsl": false,
     "Username": "",
     "Password": "",
-    "FromAddress": "tutorial-validator@example.com",
+    "FromAddress": "tutorial-validator@localhost",
     "FromName": "Tutorial Validator",
     "ToAddresses": ["your-email@example.com"]
   },
   "Discord": {
-    "Enabled": false,
+    "Enabled": true,
     "WebhookUrl": ""
   }
 }
 ```
 
-> **Note on Docker configuration:** The default `docker-compose.yml` includes a SQL Server sidecar, which was used for the initial ABP Framework tutorial validation. For tutorials targeting a different database or runtime, update `docker/docker-compose.yml` and `Dockerfile` to include the services your tutorials require.
+#### AI section
 
-### Environment variable overrides
+| Field | Description |
+|---|---|
+| `Provider` | AI provider to use. Accepted values: `OpenAI`, `AzureOpenAI`. Auto-detected from environment variables if omitted. |
+| `Model` | The model name to request from OpenAI (e.g. `gpt-5.2`, `gpt-4o`). Ignored when using Azure OpenAI. |
+| `DeploymentName` | The deployment name for Azure OpenAI. When using OpenAI directly, this can mirror the `Model` value or be left empty. |
+| `ApiKey` | Your API key. Leave blank and use the `OPENAI_API_KEY` or `AZURE_OPENAI_API_KEY` environment variable instead — do not commit keys to source control. |
 
-Environment variables always take precedence over `appsettings.json` values.
+#### Docker section
 
-| Variable | Description | Default |
-|---|---|---|
-| `OPENAI_API_KEY` | OpenAI API key | — |
-| `OPENAI_MODEL` | OpenAI model name | `gpt-4o` |
-| `AZURE_OPENAI_ENDPOINT` | Azure OpenAI endpoint URL | — |
-| `AZURE_OPENAI_API_KEY` | Azure OpenAI API key | — |
-| `AZURE_OPENAI_DEPLOYMENT` | Azure OpenAI deployment name | `gpt-4o` |
-| `AI_PROVIDER` | Force `OpenAI` or `AzureOpenAI` (auto-detected if omitted) | — |
-| `Discord__Enabled` | Enable Discord notifications (`true`/`false`) | `false` |
-| `Discord__WebhookUrl` | Discord incoming webhook URL | — |
-| `EXECUTOR_BUILD_GATE_INTERVAL` | Senior persona: run `dotnet build` every N steps (0 = disabled) | `0` |
-| `ConnectionStrings__Default` | SQL Server connection string (used inside Docker) | — |
-| `EXECUTOR_WORKDIR` | Working directory for the Executor container | — |
+| Field | Description |
+|---|---|
+| `ComposeFile` | Path to the `docker-compose.yml` file. Relative to the Orchestrator project directory. |
+| `SqlServerPassword` | The SA password for the SQL Server container. Must match the `MSSQL_SA_PASSWORD` value in `docker/.env`. |
+
+#### Orchestrator section
+
+| Field | Description |
+|---|---|
+| `DefaultOutputPath` | Default directory where all output files are written. Can be overridden with `--output`. |
+| `KeepContainersAfterRun` | When `true`, Docker containers are not stopped after the run. Useful for debugging. Can be overridden with `--keep-containers`. |
+| `TimeoutMinutes` | Maximum number of minutes the full pipeline is allowed to run before it is forcibly stopped. |
+
+#### Email section
+
+| Field | Description |
+|---|---|
+| `Enabled` | Set to `true` to send an HTML report email after each run. |
+| `SmtpHost` | Hostname of your SMTP server. |
+| `SmtpPort` | Port for the SMTP server. Common values: `25`, `465` (SSL), `587` (STARTTLS), `2525`. |
+| `UseSsl` | Set to `true` to use SSL/TLS for the SMTP connection. |
+| `Username` | SMTP authentication username. Leave blank if your server does not require authentication. |
+| `Password` | SMTP authentication password. Leave blank if your server does not require authentication. |
+| `FromAddress` | The sender email address that appears in the `From` field. |
+| `FromName` | The display name that appears alongside the sender address. |
+| `ToAddresses` | JSON array of recipient email addresses. |
+
+#### Discord section
+
+| Field | Description |
+|---|---|
+| `Enabled` | Set to `true` to post a notification to Discord after each run. |
+| `WebhookUrl` | Your Discord incoming webhook URL. Create one in your Discord server's channel settings under Integrations. Leave blank to disable even if `Enabled` is `true`. |
 
 ---
 
-## Running Tests
+### CLI Arguments
 
-```bash
-dotnet restore
-dotnet test --configuration Release
+#### Orchestrator `run` command
+
+The main command that runs the full pipeline (Analyst + Executor + Reporter).
+
 ```
+dotnet run --project src/Validator.Orchestrator -- run [options]
+```
+
+| Flag | Short | Default | Description |
+|---|---|---|---|
+| `--url` | `-u` | — | URL of the tutorial to validate. Required unless `--skip-analyst` is used. |
+| `--testplan` | `-t` | — | Path to an existing `testplan.json`. Used with `--skip-analyst` to skip the scraping phase. |
+| `--output` | `-o` | `./output` | Directory where all output files are written. |
+| `--config` | `-c` | — | Path to a custom `appsettings.json` file. Useful for CI or per-project configurations. |
+| `--persona` | — | `mid` | Developer persona for the Executor agent. Values: `junior`, `mid`, `senior`. |
+| `--local` | — | `false` | Run the Executor locally instead of inside a Docker container. |
+| `--skip-analyst` | — | `false` | Skip the scraping and analysis phase. Requires `--testplan`. |
+| `--keep-containers` | — | `false` | Keep Docker containers running after the run completes. Useful for inspecting container state. |
+| `--timeout` | — | `60` | Maximum run time in minutes before the pipeline is stopped. |
+
+#### Orchestrator `analyst-only` command
+
+Runs only the Analyst phase (scrape + generate test plan). Does not execute any steps.
+
+```
+dotnet run --project src/Validator.Orchestrator -- analyst-only [options]
+```
+
+Accepts the same `--url`, `--output`, `--config` flags as the `run` command.
+
+#### Orchestrator `docker-only` command
+
+Runs only the Executor phase inside Docker against an existing test plan.
+
+```
+dotnet run --project src/Validator.Orchestrator -- docker-only [options]
+```
+
+Accepts `--testplan`, `--output`, `--config`, `--persona`, `--keep-containers`.
+
+#### Analyst `full` command
+
+Runs the Analyst standalone (scrape + analyze). Useful for generating or inspecting a test plan before running the Executor.
+
+```
+dotnet run --project src/Validator.Analyst -- full [options]
+```
+
+| Flag | Default | Description |
+|---|---|---|
+| `--url` | — | Tutorial URL to scrape. Required. |
+| `--output` | `Output` | Directory for scraped content and `testplan.json`. |
+| `--config` | — | Path to a custom `appsettings.json` for AI credentials. |
+| `--max-pages` | `20` | Maximum number of tutorial pages to scrape. The Analyst follows navigation links within the same tutorial series up to this limit. Increase it for very long tutorials. |
+| `--target-steps` | `50` | The Analyst compacts adjacent similar steps to keep the plan manageable. This is the target number of steps after compaction. The Analyst will try to reduce the plan to this count without losing information. |
+| `--max-steps` | `55` | Hard upper limit on the number of steps. If the plan still exceeds this after normal compaction, a more aggressive compaction pass runs. Set higher values if you notice important steps being merged away. |
+
+#### Executor `run` command
+
+Executes an existing test plan directly, without Docker.
+
+```
+dotnet run --project src/Validator.Executor -- run [options]
+```
+
+| Flag | Default | Description |
+|---|---|---|
+| `--input` | — | Path to `testplan.json`. Required. |
+| `--workdir` | Current directory | Working directory where the Executor creates files and runs commands. |
+| `--output` | `results` | Directory for result files. |
+| `--config` | — | Path to a custom `appsettings.json` for AI credentials. |
+| `--persona` | `mid` | Developer persona. Values: `junior`, `mid`, `senior`. |
+| `--dry-run` | `false` | Prints the steps that would be executed without actually running them. Useful for verifying a test plan before committing to a full run. |
+
+---
+
+### Environment Variables
+
+Environment variables always override values in `appsettings.json`.
+
+| Variable | Description |
+|---|---|
+| `OPENAI_API_KEY` | OpenAI API key. |
+| `OPENAI_MODEL` | OpenAI model name (e.g. `gpt-5.2`, `gpt-4o`). |
+| `AZURE_OPENAI_ENDPOINT` | Azure OpenAI endpoint URL (e.g. `https://your-resource.openai.azure.com/`). |
+| `AZURE_OPENAI_API_KEY` | Azure OpenAI API key. |
+| `AZURE_OPENAI_DEPLOYMENT` | Azure OpenAI deployment name. |
+| `AI_PROVIDER` | Force a specific provider: `OpenAI` or `AzureOpenAI`. Auto-detected if omitted. |
+| `Discord__Enabled` | Enable Discord notifications: `true` or `false`. |
+| `Discord__WebhookUrl` | Discord incoming webhook URL. |
+| `EXECUTOR_BUILD_GATE_INTERVAL` | Senior persona only: run `dotnet build` every N steps as a sanity check. `0` disables this. |
+| `ConnectionStrings__Default` | SQL Server connection string used inside the Docker executor container. |
+| `EXECUTOR_WORKDIR` | Working directory for the executor container. Set automatically by `docker-compose.yml`. |
+
+---
+
+## Learn More
+
+- [How It Works](HOW_IT_WORKS.md) — an accessible explanation of the pipeline, the AI agent, and what each phase does
+- [Technical Reference](TECHNICAL_REFERENCE.md) — deep documentation covering architecture, schemas, plugin system, CI/CD integration, and how to extend the tool
 
 ---
 
