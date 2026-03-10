@@ -58,7 +58,7 @@ dotnet build
 
 ```bash
 cp docker/.env.example docker/.env
-# Edit docker/.env and set OPENAI_API_KEY or Azure OpenAI credentials
+# Edit docker/.env and set OpenAI, OpenAI-compatible, or Azure OpenAI credentials
 ```
 
 **5. Run tests**

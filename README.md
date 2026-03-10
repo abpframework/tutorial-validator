@@ -1,12 +1,11 @@
 # TutorialValidator
 
-[![CI](https://github.com/AbpFramework/TutorialValidator/actions/workflows/ci.yml/badge.svg)](https://github.com/AbpFramework/TutorialValidator/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![.NET](https://img.shields.io/badge/.NET-10-512BD4)](https://dotnet.microsoft.com/download/dotnet/10.0)
 
-TutorialValidator is an AI-powered tool that checks whether a software documentation tutorial actually works. You give it a URL, it scrapes the tutorial, turns every instruction into an executable step, then runs those steps exactly as a developer would — installing packages, writing files, running commands, making HTTP calls, and asserting results. If any step fails, the tutorial has a bug.
+TutorialValidator is an AI-powered tool that checks whether a software documentation tutorial actually works. You give it a URL, it scrapes the tutorial, turns every instruction into an executable step, then runs those steps exactly as a developer would — installing packages, writing files, running commands, making HTTP calls, and asserting results.
 
-It was built to validate [ABP Framework](https://abp.io) tutorials, but the architecture supports any publicly accessible tutorial.
+We originally built it internally to validate [ABP Framework](https://abp.io) tutorials, and then decided to publish it as open source so you can use it to validate any publicly accessible tutorial.
 
 ---
 
@@ -18,7 +17,7 @@ Before you start, make sure you have the following installed:
 |---|---|---|
 | .NET SDK | 10.0 | [dotnet.microsoft.com](https://dotnet.microsoft.com/download/dotnet/10.0) |
 | Docker Desktop | Latest | [docker.com/get-started](https://www.docker.com/get-started/) |
-| OpenAI **or** Azure OpenAI API key | — | [platform.openai.com](https://platform.openai.com) or your Azure portal |
+| AI provider API key | — | Refer to your AI provider's documentation |
 
 > Docker is required for the default (recommended) execution mode. If you want to run without Docker, see [Running Locally Without Docker](#running-locally-without-docker) below.
 
@@ -43,21 +42,27 @@ cp docker/.env.example docker/.env
 
 **Step 3 — Add your API key**
 
-Open `docker/.env` in any text editor and fill in your credentials.
+Open `docker/.env` in any text editor and fill in your AI provider credentials. For example:
 
-For OpenAI:
 ```env
+# OpenAI
 OPENAI_API_KEY=sk-...
 OPENAI_MODEL=gpt-5.2
-```
 
-For Azure OpenAI:
-```env
+# OpenAI-Compatible (works with providers that expose an OpenAI-compatible API)
+# OPENAI_COMPAT_BASE_URL=https://your-provider.example.com/v1
+# OPENAI_COMPAT_API_KEY=your-key
+# OPENAI_COMPAT_MODEL=gpt-4o-mini
+# AI_PROVIDER=OpenAICompatible
+
+# Azure OpenAI
 AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com/
 AZURE_OPENAI_API_KEY=your-key
 AZURE_OPENAI_DEPLOYMENT=gpt-4o
 AI_PROVIDER=AzureOpenAI
 ```
+
+See [Environment Variables](#environment-variables) for all supported providers.
 
 **Step 4 — Run the validation**
 
@@ -210,10 +215,11 @@ The file at `src/Validator.Orchestrator/appsettings.json` controls all default s
 
 | Field | Description |
 |---|---|
-| `Provider` | AI provider to use. Accepted values: `OpenAI`, `AzureOpenAI`. Auto-detected from environment variables if omitted. |
-| `Model` | The model name to request from OpenAI (e.g. `gpt-5.2`, `gpt-4o`). Ignored when using Azure OpenAI. |
+| `Provider` | AI provider to use. Accepted values: `OpenAI`, `AzureOpenAI`, `OpenAICompatible`. Auto-detected from environment variables if omitted. |
+| `Model` | The model name to request from your AI provider (e.g. `gpt-5.2`, `gpt-4o`). Ignored when using Azure OpenAI. |
 | `DeploymentName` | The deployment name for Azure OpenAI. When using OpenAI directly, this can mirror the `Model` value or be left empty. |
-| `ApiKey` | Your API key. Leave blank and use the `OPENAI_API_KEY` or `AZURE_OPENAI_API_KEY` environment variable instead — do not commit keys to source control. |
+| `ApiKey` | Your AI provider API key. Leave blank and use environment variables (`OPENAI_API_KEY`, `AZURE_OPENAI_API_KEY`, or `OPENAI_COMPAT_API_KEY`) instead — do not commit keys to source control. |
+| `BaseUrl` | Base URL for OpenAI-compatible providers (e.g. `https://your-provider.example.com/v1`). Used when `Provider` is `OpenAICompatible`. |
 
 #### Docker section
 
@@ -339,10 +345,15 @@ Environment variables always override values in `appsettings.json`.
 |---|---|
 | `OPENAI_API_KEY` | OpenAI API key. |
 | `OPENAI_MODEL` | OpenAI model name (e.g. `gpt-5.2`, `gpt-4o`). |
+| `OPENAI_COMPAT_BASE_URL` | Base URL for an OpenAI-compatible API endpoint. |
+| `OPENAI_COMPAT_API_KEY` | API key for an OpenAI-compatible provider. |
+| `OPENAI_COMPAT_MODEL` | Model name for OpenAI-compatible providers. |
+| `OPENAI_COMPAT_ORG` | Optional organization ID for OpenAI-compatible providers. |
+| `OPENAI_COMPAT_PROJECT` | Optional project ID for OpenAI-compatible providers. |
 | `AZURE_OPENAI_ENDPOINT` | Azure OpenAI endpoint URL (e.g. `https://your-resource.openai.azure.com/`). |
 | `AZURE_OPENAI_API_KEY` | Azure OpenAI API key. |
 | `AZURE_OPENAI_DEPLOYMENT` | Azure OpenAI deployment name. |
-| `AI_PROVIDER` | Force a specific provider: `OpenAI` or `AzureOpenAI`. Auto-detected if omitted. |
+| `AI_PROVIDER` | Force a specific provider: `OpenAI`, `AzureOpenAI`, or `OpenAICompatible`. Auto-detected if omitted. |
 | `Discord__Enabled` | Enable Discord notifications: `true` or `false`. |
 | `Discord__WebhookUrl` | Discord incoming webhook URL. |
 | `EXECUTOR_BUILD_GATE_INTERVAL` | Senior persona only: run `dotnet build` every N steps as a sanity check. `0` disables this. |
@@ -366,5 +377,5 @@ Contributions are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) for de
 
 ## License
 
-MIT License — Copyright (c) 2024 [Volosoft](https://volosoft.com).
+MIT License — Copyright (c) [Volosoft](https://volosoft.com).
 See [LICENSE](LICENSE) for the full text.

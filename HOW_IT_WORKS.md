@@ -60,7 +60,7 @@ The Analyst's job is to read the tutorial and produce a machine-readable test pl
 
 **Scraping** — The Analyst fetches the tutorial URL and parses the HTML. It follows navigation links within the same tutorial series, collecting up to a configurable maximum number of pages. Each page is converted to clean Markdown.
 
-**Analysis** — The Analyst sends the Markdown content to an AI model (OpenAI or Azure OpenAI) with a prompt that instructs it to extract every action a developer must take. The result is a list of structured steps in JSON format, called the **test plan** (`testplan.json`).
+**Analysis** — The Analyst sends the Markdown content to an AI model (OpenAI, Azure OpenAI, or any OpenAI-compatible provider) with a prompt that instructs it to extract every action a developer must take. The result is a list of structured steps in JSON format, called the **test plan** (`testplan.json`).
 
 **Compaction** — Long tutorials can produce hundreds of raw steps. To keep execution time and AI cost reasonable, the Analyst merges adjacent steps of the same type (e.g., two consecutive file edits become one step with two modifications). This is controlled by the `--target-steps` and `--max-steps` arguments.
 

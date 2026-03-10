@@ -146,7 +146,7 @@ After compaction, all steps are renumbered sequentially starting from 1.
 ### 3.1 Initialization
 
 `AgentKernelFactory.CreateExecutorKernel` builds a `Microsoft.SemanticKernel.Kernel` with:
-- The configured AI chat completion service (OpenAI or Azure OpenAI)
+- The configured AI chat completion service (OpenAI, Azure OpenAI, or OpenAI-compatible endpoint)
 - Four plugins registered as kernel functions (see [3.3 Plugins](#33-plugins))
 - A `FunctionCallTracker` that intercepts and records every function call and its result for deterministic result parsing
 
@@ -487,7 +487,8 @@ A workaround for the .NET 10 SDK image ships an RC/preview runtime while ABP CLI
 
 1. If `AI_PROVIDER` is set explicitly, use that value (`OpenAI` or `AzureOpenAI`).
 2. If `AZURE_OPENAI_ENDPOINT` is set, default to `AzureOpenAI`.
-3. Otherwise, use `OpenAI`.
+3. Otherwise, if `OPENAI_COMPAT_BASE_URL` and `OPENAI_COMPAT_API_KEY` are present, use `OpenAICompatible`.
+4. Otherwise, use `OpenAI`.
 
 ### OpenAI Configuration
 
@@ -505,6 +506,19 @@ Required:
 - `AZURE_OPENAI_DEPLOYMENT` or `AI.DeploymentName` — the deployment name in your Azure resource
 
 `AI.Model` is ignored for Azure OpenAI; the model is determined by the deployment.
+
+### OpenAI-Compatible Configuration
+
+Required:
+- `OPENAI_COMPAT_BASE_URL` or `AI.BaseUrl` in `appsettings.json`
+- `OPENAI_COMPAT_API_KEY` or `AI.ApiKey`
+- `OPENAI_COMPAT_MODEL` or `AI.ModelId` (falls back to `AI.DeploymentName`)
+
+Optional:
+- `OPENAI_COMPAT_ORG` / `AI.Organization`
+- `OPENAI_COMPAT_PROJECT` / `AI.Project`
+
+Set `AI_PROVIDER=OpenAICompatible` to force this mode when multiple provider variables are present.
 
 ### Configuration Precedence
 

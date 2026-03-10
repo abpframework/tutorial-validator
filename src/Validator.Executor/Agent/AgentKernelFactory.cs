@@ -10,6 +10,10 @@ namespace Validator.Executor.Agent;
 /// </summary>
 public static class AgentKernelFactory
 {
+    private const string ProviderAzureOpenAI = "AzureOpenAI";
+    private const string ProviderOpenAI = "OpenAI";
+    private const string ProviderOpenAICompatible = "OpenAICompatible";
+
     /// <summary>
     /// Loads AI configuration from appsettings.json and environment variables.
     /// Environment variables take precedence over JSON config.
@@ -52,16 +56,31 @@ public static class AgentKernelFactory
             config.DeploymentName = aiSection["DeploymentName"] ?? config.DeploymentName;
             config.ApiKey = aiSection["ApiKey"] ?? config.ApiKey;
             config.ModelId = aiSection["ModelId"];
+            if (string.IsNullOrEmpty(config.ModelId))
+            {
+                config.ModelId = aiSection["Model"];
+            }
+            config.BaseUrl = aiSection["BaseUrl"];
+            config.Organization = aiSection["Organization"];
+            config.Project = aiSection["Project"];
         }
 
         // Override with environment variables
+        var explicitProvider = false;
+        var aiProvider = Environment.GetEnvironmentVariable("AI_PROVIDER");
+        if (!string.IsNullOrEmpty(aiProvider))
+        {
+            config.Provider = aiProvider;
+            explicitProvider = true;
+        }
+
         var azureEndpoint = Environment.GetEnvironmentVariable("AZURE_OPENAI_ENDPOINT");
         var azureApiKey = Environment.GetEnvironmentVariable("AZURE_OPENAI_API_KEY");
         var azureDeployment = Environment.GetEnvironmentVariable("AZURE_OPENAI_DEPLOYMENT");
 
-        if (!string.IsNullOrEmpty(azureEndpoint))
+        if (!string.IsNullOrEmpty(azureEndpoint) && !explicitProvider)
         {
-            config.Provider = "AzureOpenAI";
+            config.Provider = ProviderAzureOpenAI;
             config.Endpoint = azureEndpoint;
         }
 
@@ -75,13 +94,53 @@ public static class AgentKernelFactory
             config.DeploymentName = azureDeployment;
         }
 
+        // OpenAI-compatible environment variables
+        var openAiCompatBaseUrl = Environment.GetEnvironmentVariable("OPENAI_COMPAT_BASE_URL");
+        var openAiCompatApiKey = Environment.GetEnvironmentVariable("OPENAI_COMPAT_API_KEY");
+        var openAiCompatModel = Environment.GetEnvironmentVariable("OPENAI_COMPAT_MODEL");
+        var openAiCompatOrg = Environment.GetEnvironmentVariable("OPENAI_COMPAT_ORG");
+        var openAiCompatProject = Environment.GetEnvironmentVariable("OPENAI_COMPAT_PROJECT");
+
+        if (!string.IsNullOrEmpty(openAiCompatBaseUrl))
+        {
+            config.BaseUrl = openAiCompatBaseUrl;
+        }
+
+        if (!string.IsNullOrEmpty(openAiCompatOrg))
+        {
+            config.Organization = openAiCompatOrg;
+        }
+
+        if (!string.IsNullOrEmpty(openAiCompatProject))
+        {
+            config.Project = openAiCompatProject;
+        }
+
+        if (!string.IsNullOrEmpty(openAiCompatApiKey))
+        {
+            config.ApiKey = openAiCompatApiKey;
+        }
+
+        if (!string.IsNullOrEmpty(openAiCompatModel))
+        {
+            config.ModelId = openAiCompatModel;
+        }
+
+        if (!explicitProvider && !string.IsNullOrEmpty(openAiCompatBaseUrl) && !string.IsNullOrEmpty(openAiCompatApiKey))
+        {
+            config.Provider = ProviderOpenAICompatible;
+        }
+
         // OpenAI environment variables
         var openaiApiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
         var openaiModel = Environment.GetEnvironmentVariable("OPENAI_MODEL");
 
         if (!string.IsNullOrEmpty(openaiApiKey) && string.IsNullOrEmpty(azureApiKey))
         {
-            config.Provider = "OpenAI";
+            if (!explicitProvider)
+            {
+                config.Provider = ProviderOpenAI;
+            }
             config.ApiKey = openaiApiKey;
         }
 
@@ -90,11 +149,10 @@ public static class AgentKernelFactory
             config.DeploymentName = openaiModel;
         }
 
-        // AI_PROVIDER override
-        var aiProvider = Environment.GetEnvironmentVariable("AI_PROVIDER");
-        if (!string.IsNullOrEmpty(aiProvider))
+        if (config.Provider.Equals(ProviderOpenAICompatible, StringComparison.OrdinalIgnoreCase) &&
+            string.IsNullOrWhiteSpace(config.ModelId))
         {
-            config.Provider = aiProvider;
+            config.ModelId = config.DeploymentName;
         }
 
         return config;
@@ -109,16 +167,33 @@ public static class AgentKernelFactory
         if (string.IsNullOrEmpty(config.ApiKey))
         {
             throw new InvalidOperationException(
-                "API key is required. Set AZURE_OPENAI_API_KEY or OPENAI_API_KEY environment variable, " +
+                "API key is required. Set AZURE_OPENAI_API_KEY, OPENAI_API_KEY, or OPENAI_COMPAT_API_KEY environment variable, " +
                 "or configure in appsettings.json under AI:ApiKey.");
         }
 
-        if (config.Provider.Equals("AzureOpenAI", StringComparison.OrdinalIgnoreCase) &&
+        if (config.Provider.Equals(ProviderAzureOpenAI, StringComparison.OrdinalIgnoreCase) &&
             string.IsNullOrEmpty(config.Endpoint))
         {
             throw new InvalidOperationException(
                 "Azure OpenAI endpoint is required. Set AZURE_OPENAI_ENDPOINT environment variable, " +
                 "or configure in appsettings.json under AI:Endpoint.");
+        }
+
+        if (config.Provider.Equals(ProviderOpenAICompatible, StringComparison.OrdinalIgnoreCase))
+        {
+            if (string.IsNullOrWhiteSpace(config.BaseUrl))
+            {
+                throw new InvalidOperationException(
+                    "OpenAI-compatible base URL is required. Set OPENAI_COMPAT_BASE_URL environment variable, " +
+                    "or configure in appsettings.json under AI:BaseUrl.");
+            }
+
+            if (string.IsNullOrWhiteSpace(config.ModelId) && string.IsNullOrWhiteSpace(config.DeploymentName))
+            {
+                throw new InvalidOperationException(
+                    "OpenAI-compatible model is required. Set OPENAI_COMPAT_MODEL environment variable, " +
+                    "or configure in appsettings.json under AI:ModelId or AI:DeploymentName.");
+            }
         }
     }
 
@@ -134,7 +209,7 @@ public static class AgentKernelFactory
         var builder = Kernel.CreateBuilder();
 
         // Add AI service based on provider
-        if (config.Provider.Equals("AzureOpenAI", StringComparison.OrdinalIgnoreCase))
+        if (config.Provider.Equals(ProviderAzureOpenAI, StringComparison.OrdinalIgnoreCase))
         {
             builder.AddAzureOpenAIChatCompletion(
                 deploymentName: config.DeploymentName,
@@ -142,15 +217,25 @@ public static class AgentKernelFactory
                 apiKey: config.ApiKey,
                 modelId: config.ModelId);
         }
-        else if (config.Provider.Equals("OpenAI", StringComparison.OrdinalIgnoreCase))
+        else if (config.Provider.Equals(ProviderOpenAI, StringComparison.OrdinalIgnoreCase))
         {
             builder.AddOpenAIChatCompletion(
                 modelId: config.ModelId ?? config.DeploymentName,
                 apiKey: config.ApiKey);
         }
+        else if (config.Provider.Equals(ProviderOpenAICompatible, StringComparison.OrdinalIgnoreCase))
+        {
+            var endpoint = new Uri(config.BaseUrl!, UriKind.Absolute);
+
+            builder.AddOpenAIChatCompletion(
+                modelId: config.ModelId ?? config.DeploymentName,
+                apiKey: config.ApiKey,
+                endpoint: endpoint);
+        }
         else
         {
-            throw new InvalidOperationException($"Unsupported AI provider: {config.Provider}");
+            throw new InvalidOperationException(
+                $"Unsupported AI provider: {config.Provider}. Supported providers: {ProviderAzureOpenAI}, {ProviderOpenAI}, {ProviderOpenAICompatible}.");
         }
 
         // Build the kernel first

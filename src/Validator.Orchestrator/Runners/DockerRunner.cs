@@ -284,6 +284,39 @@ public class DockerRunner
             envVars["OPENAI_MODEL"] = openAiModel;
         }
 
+        // OpenAI-compatible
+        var openAiCompatBaseUrl = _configuration.GetValue<string>("AI:BaseUrl")
+            ?? Environment.GetEnvironmentVariable("OPENAI_COMPAT_BASE_URL");
+        var openAiCompatKey = _configuration.GetValue<string>("AI:ApiKey")
+            ?? Environment.GetEnvironmentVariable("OPENAI_COMPAT_API_KEY");
+        var openAiCompatModel = _configuration.GetValue<string>("AI:ModelId")
+            ?? _configuration.GetValue<string>("AI:Model")
+            ?? _configuration.GetValue<string>("AI:DeploymentName")
+            ?? Environment.GetEnvironmentVariable("OPENAI_COMPAT_MODEL")
+            ?? "gpt-4o";
+        var openAiCompatOrg = _configuration.GetValue<string>("AI:Organization")
+            ?? Environment.GetEnvironmentVariable("OPENAI_COMPAT_ORG");
+        var openAiCompatProject = _configuration.GetValue<string>("AI:Project")
+            ?? Environment.GetEnvironmentVariable("OPENAI_COMPAT_PROJECT");
+
+        if (!string.IsNullOrEmpty(openAiCompatBaseUrl))
+        {
+            envVars["OPENAI_COMPAT_BASE_URL"] = openAiCompatBaseUrl;
+        }
+        if (!string.IsNullOrEmpty(openAiCompatKey))
+        {
+            envVars["OPENAI_COMPAT_API_KEY"] = openAiCompatKey;
+            envVars["OPENAI_COMPAT_MODEL"] = openAiCompatModel;
+        }
+        if (!string.IsNullOrEmpty(openAiCompatOrg))
+        {
+            envVars["OPENAI_COMPAT_ORG"] = openAiCompatOrg;
+        }
+        if (!string.IsNullOrEmpty(openAiCompatProject))
+        {
+            envVars["OPENAI_COMPAT_PROJECT"] = openAiCompatProject;
+        }
+
         // Provider override
         var provider = _configuration.GetValue<string>("AI:Provider")
             ?? Environment.GetEnvironmentVariable("AI_PROVIDER");

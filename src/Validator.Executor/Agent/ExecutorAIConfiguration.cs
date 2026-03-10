@@ -6,7 +6,7 @@ namespace Validator.Executor.Agent;
 public class ExecutorAIConfiguration
 {
     /// <summary>
-    /// The AI provider to use: "AzureOpenAI" or "OpenAI".
+    /// The AI provider to use: "AzureOpenAI", "OpenAI", or "OpenAICompatible".
     /// </summary>
     public string Provider { get; set; } = "AzureOpenAI";
 
@@ -29,4 +29,19 @@ public class ExecutorAIConfiguration
     /// Optional model ID override.
     /// </summary>
     public string? ModelId { get; set; }
+
+    /// <summary>
+    /// Base URL for OpenAI-compatible providers.
+    /// </summary>
+    public string? BaseUrl { get; set; }
+
+    /// <summary>
+    /// Optional organization identifier for OpenAI-compatible providers.
+    /// </summary>
+    public string? Organization { get; set; }
+
+    /// <summary>
+    /// Optional project identifier for OpenAI-compatible providers.
+    /// </summary>
+    public string? Project { get; set; }
 }

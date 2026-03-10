@@ -6,7 +6,7 @@ namespace Validator.Analyst.Analysis;
 public class AIConfiguration
 {
     /// <summary>
-    /// AI provider type: "AzureOpenAI" or "OpenAI".
+    /// AI provider type: "AzureOpenAI", "OpenAI", or "OpenAICompatible".
     /// </summary>
     public string Provider { get; set; } = "AzureOpenAI";
 
@@ -29,4 +29,19 @@ public class AIConfiguration
     /// Model ID to use (defaults to DeploymentName if not specified).
     /// </summary>
     public string? ModelId { get; set; }
+
+    /// <summary>
+    /// Base URL for OpenAI-compatible providers.
+    /// </summary>
+    public string? BaseUrl { get; set; }
+
+    /// <summary>
+    /// Optional organization identifier for OpenAI-compatible providers.
+    /// </summary>
+    public string? Organization { get; set; }
+
+    /// <summary>
+    /// Optional project identifier for OpenAI-compatible providers.
+    /// </summary>
+    public string? Project { get; set; }
 }

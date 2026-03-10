@@ -74,6 +74,14 @@ void ShowHelp()
     Console.WriteLine("    OPENAI_API_KEY            OpenAI API key");
     Console.WriteLine("    OPENAI_MODEL              Model name (default: gpt-4o)");
     Console.WriteLine();
+    Console.WriteLine("  OpenAI-Compatible:");
+    Console.WriteLine("    OPENAI_COMPAT_BASE_URL    Provider base URL (e.g. https://api.example.com/v1)");
+    Console.WriteLine("    OPENAI_COMPAT_API_KEY     API key");
+    Console.WriteLine("    OPENAI_COMPAT_MODEL       Model name");
+    Console.WriteLine("    OPENAI_COMPAT_ORG         Optional organization ID");
+    Console.WriteLine("    OPENAI_COMPAT_PROJECT     Optional project ID");
+    Console.WriteLine("    AI_PROVIDER               Force provider: OpenAI, AzureOpenAI, OpenAICompatible");
+    Console.WriteLine();
     Console.WriteLine("Examples:");
     Console.WriteLine();
     Console.WriteLine("  # Scrape a tutorial");
