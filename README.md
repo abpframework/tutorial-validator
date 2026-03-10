@@ -7,6 +7,22 @@ TutorialValidator is an AI-powered tool that checks whether a software documenta
 
 We originally built it internally to validate [ABP Framework](https://abp.io) tutorials, and then decided to publish it as open source so you can use it to validate any publicly accessible tutorial.
 
+## See It in Action
+
+The following screenshots show the three main phases of a validation run.
+
+**Orchestrator** — coordinates the full pipeline, launching the Analyst and Executor in sequence and collecting the final results.
+
+![Orchestrator](docs/images/image.png)
+
+**Analyst** — scrapes the tutorial pages and uses AI to extract every instruction into a structured, executable test plan.
+
+![Analyst](docs/images/image-1.png)
+
+**Executor** — works through the test plan step by step, running commands, writing files, and asserting outcomes just as a real developer would.
+
+![Executor](docs/images/image-2.png)
+
 ---
 
 ## Prerequisites
