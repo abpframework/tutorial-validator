@@ -20,6 +20,7 @@ on:
 
 jobs:
   build-and-test:
+    if: github.event_name != 'pull_request' || contains('OWNER,MEMBER,COLLABORATOR', github.event.pull_request.author_association)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -42,7 +43,8 @@ jobs:
   validate-tutorial:
     needs: build-and-test
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
+    environment: protected-validation
+    if: github.ref == 'refs/heads/main' || (github.event_name == 'workflow_dispatch' && contains(',skoc,', format(',{0},', github.actor)))
     
     steps:
       - name: Checkout code
