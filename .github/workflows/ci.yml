@@ -1,10 +1,6 @@
 name: CI/CD Pipeline
 
 on:
-  push:
-    branches: [ main, develop ]
-  pull_request:
-    branches: [ main ]
   workflow_dispatch:
     inputs:
       tutorial_url:
@@ -20,7 +16,6 @@ on:
 
 jobs:
   build-and-test:
-    if: github.event_name != 'pull_request' || contains('OWNER,MEMBER,COLLABORATOR', github.event.pull_request.author_association)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -44,7 +39,6 @@ jobs:
     needs: build-and-test
     runs-on: ubuntu-latest
     environment: protected-validation
-    if: github.ref == 'refs/heads/main' || (github.event_name == 'workflow_dispatch' && contains(',skoc,', format(',{0},', github.actor)))
     
     steps:
       - name: Checkout code
@@ -83,22 +77,3 @@ jobs:
           name: validation-results
           path: output/
           
-      - name: Comment PR with results
-        if: github.event_name == 'pull_request'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            const path = './output/summary.json';
-            
-            if (fs.existsSync(path)) {
-              const summary = JSON.parse(fs.readFileSync(path, 'utf8'));
-              const status = summary.OverallStatus === 'Passed' ? '✅' : '❌';
-              
-              github.rest.issues.createComment({
-                issue_number: context.issue.number,
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                body: `## Tutorial Validation Results ${status}\n\n**Tutorial:** ${summary.TutorialName}\n**Status:** ${summary.OverallStatus}\n**Duration:** ${summary.Duration}\n\nSee artifacts for detailed results.`
-              });
-            }
