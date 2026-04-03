@@ -77,3 +77,122 @@ jobs:
           name: validation-results
           path: output/
           
+      - name: Notify abp.io of validation result
+        if: always()
+        env:
+          ABPIO_VALIDATION_API_KEY: ${{ secrets.ABPIO_VALIDATION_API_KEY }}
+          ABPIO_REPORT_BASE_URL: ${{ secrets.ABPIO_REPORT_BASE_URL }}
+          DEFAULT_TUTORIAL_URL: ${{ github.event.inputs.tutorial_url || 'https://abp.io/docs/latest/tutorials/book-store?UI=MVC&DB=EF' }}
+        run: |
+          SUMMARY_FILE="./output/summary.json"
+          BASE_URL="${ABPIO_REPORT_BASE_URL:-https://abp.io}"
+          BASE_URL="${BASE_URL%/}"
+          RESPONSE_FILE="$(mktemp)"
+
+          echo "=========================================="
+          echo "  Tutorial Validation Notification"
+          echo "=========================================="
+
+          if [ ! -f "$SUMMARY_FILE" ]; then
+            echo "No summary.json found at $SUMMARY_FILE"
+            ls -la ./output/ 2>/dev/null || echo "Directory not found"
+            exit 0
+          fi
+
+          if [ -z "$ABPIO_VALIDATION_API_KEY" ]; then
+            echo "ABPIO_VALIDATION_API_KEY not set, skipping notification"
+            exit 0
+          fi
+
+          if ! jq empty "$SUMMARY_FILE" >/dev/null 2>&1; then
+            echo "summary.json is not valid JSON"
+            cat "$SUMMARY_FILE"
+            exit 0
+          fi
+
+          OVERALL_STATUS=$(jq -r '.overallStatus // .OverallStatus // empty' "$SUMMARY_FILE")
+          TUTORIAL_URL=$(jq -r '.tutorialUrl // .TutorialUrl // empty' "$SUMMARY_FILE")
+          TUTORIAL_NAME=$(jq -r '.tutorialName // .TutorialName // "Unknown Tutorial"' "$SUMMARY_FILE")
+
+          if [ -z "$TUTORIAL_URL" ] || [ "$TUTORIAL_URL" = "null" ]; then
+            TUTORIAL_URL="$DEFAULT_TUTORIAL_URL"
+            echo "summary.json had no tutorialUrl; using workflow default URL"
+          fi
+
+          if [ -z "$OVERALL_STATUS" ] || [ "$OVERALL_STATUS" = "null" ]; then
+            echo "summary.json missing overall status field"
+            exit 0
+          fi
+
+          OS_LOWER=$(echo "$OVERALL_STATUS" | tr '[:upper:]' '[:lower:]')
+          PASSED=false
+          if [ "$OS_LOWER" = "passed" ]; then
+            PASSED=true
+          fi
+
+          echo "Tutorial: $TUTORIAL_NAME"
+          echo "URL: $TUTORIAL_URL"
+          echo "Status: $OVERALL_STATUS"
+          echo "Passed (query): $PASSED"
+
+          REPORT_QUERY=$(python3 -c "import sys, urllib.parse; print(urllib.parse.urlencode({'tutorialUrl': sys.argv[1], 'passed': sys.argv[2]}))" "$TUTORIAL_URL" "$PASSED")
+          REPORT_URL="${BASE_URL}/api/tutorial-validation/report?${REPORT_QUERY}"
+
+          MAX_RETRIES=3
+          RETRY_DELAY=5
+          SUCCESS=false
+
+          for i in $(seq 1 $MAX_RETRIES); do
+            echo ""
+            echo "Attempt $i/$MAX_RETRIES: POST ${BASE_URL}/api/tutorial-validation/report"
+
+            HTTP_CODE=$(curl -sS \
+              --connect-timeout 10 \
+              --max-time 30 \
+              -o "$RESPONSE_FILE" \
+              -w "%{http_code}" \
+              -X POST "$REPORT_URL" \
+              -H "X-Api-Key: ${ABPIO_VALIDATION_API_KEY}")
+
+            if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "201" ]; then
+              echo "Successfully reported to abp.io (HTTP $HTTP_CODE)"
+              SUCCESS=true
+              break
+            elif [ "$HTTP_CODE" = "401" ]; then
+              echo "Authentication failed - check ABPIO_VALIDATION_API_KEY"
+              cat "$RESPONSE_FILE" 2>/dev/null || true
+              break
+            elif [ "$HTTP_CODE" = "400" ]; then
+              echo "Bad request (invalid tutorialUrl or unsupported host?)"
+              cat "$RESPONSE_FILE" 2>/dev/null || true
+              break
+            elif [ "$HTTP_CODE" = "409" ]; then
+              echo "Report lock contention (HTTP 409)"
+              cat "$RESPONSE_FILE" 2>/dev/null || true
+              if [ $i -lt $MAX_RETRIES ]; then
+                echo "Retrying in ${RETRY_DELAY}s..."
+                sleep $RETRY_DELAY
+              fi
+            else
+              echo "Attempt $i/$MAX_RETRIES failed (HTTP $HTTP_CODE)"
+              cat "$RESPONSE_FILE" 2>/dev/null || true
+              if [ $i -lt $MAX_RETRIES ]; then
+                echo "Retrying in ${RETRY_DELAY}s..."
+                sleep $RETRY_DELAY
+              fi
+            fi
+          done
+
+          rm -f "$RESPONSE_FILE"
+
+          if [ "$SUCCESS" = false ]; then
+            echo ""
+            echo "Failed to report to abp.io after $MAX_RETRIES attempts"
+            echo "Final HTTP Code: $HTTP_CODE"
+            exit 1
+          fi
+
+          echo ""
+          echo "=========================================="
+          echo "  Notification Complete"
+          echo "=========================================="
