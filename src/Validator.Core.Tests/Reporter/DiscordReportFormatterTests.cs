@@ -11,25 +11,42 @@ namespace Validator.Core.Tests.Reporter;
 public class DiscordReportFormatterTests
 {
     [Fact]
-    public void FormatMessages_ShouldSplitLongStepResults_WithoutTruncationMarker()
+    public void FormatMessages_ShouldSplitLongFailureDiagnostics_WithoutTruncationMarker()
     {
-        var report = CreateReport(140);
-        var formatter = new DiscordReportFormatter();
+        var report = CreateReport(3);
+        report.Result.Status = ValidationStatus.Failed;
+        report.Result.PassedSteps = 2;
+        report.Result.FailedSteps = 1;
+        report.Result.FailedAtStepId = 3;
+        report.Result.StepResults[2].Status = StepExecutionStatus.Failed;
+        report.Result.StepResults[2].ErrorMessage = "error";
+        report.FailureDiagnostics =
+        [
+            new FailureDiagnostic
+            {
+                StepId = 3,
+                Classification = FailureClassification.Unknown,
+                Explanation = new string('z', 2500)
+            }
+        ];
 
+        var formatter = new DiscordReportFormatter();
         var messages = formatter.FormatMessages(report);
-        var stepMessages = messages
-            .Where(m => m.Embeds.Count > 0 && m.Embeds[0].Fields.Any(f => f.Name == "Step Results"))
+        var diagnosticsMessages = messages
+            .Where(m => m.Embeds.Count > 0 && m.Embeds[0].Fields.Any(f => f.Name == "Failure Diagnostics"))
             .ToList();
 
-        Assert.True(stepMessages.Count > 1);
+        Assert.True(diagnosticsMessages.Count > 1);
 
-        var allStepText = string.Join(
-            '\n',
-            stepMessages.Select(m => m.Embeds[0].Fields.First(f => f.Name == "Step Results").Value));
+        var fieldValues = diagnosticsMessages
+            .Select(m => m.Embeds[0].Fields.First(f => f.Name == "Failure Diagnostics").Value)
+            .ToList();
 
-        Assert.Contains("Step 1", allStepText);
-        Assert.Contains("Step 140", allStepText);
-        Assert.DoesNotContain("… (truncated)", allStepText);
+        var allDiagnosticsText = string.Join('\n', fieldValues);
+
+        Assert.Contains("Step 3", allDiagnosticsText);
+        Assert.Equal(2500, fieldValues.Sum(v => v.Count(c => c == 'z')));
+        Assert.DoesNotContain("… (truncated)", allDiagnosticsText);
     }
 
     [Fact]
