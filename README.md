@@ -1,9 +1,9 @@
-# TutorialValidator
+# AI Tutorial Validator
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![.NET](https://img.shields.io/badge/.NET-10-512BD4)](https://dotnet.microsoft.com/download/dotnet/10.0)
 
-TutorialValidator is an AI-powered tool that checks whether a software documentation tutorial actually works. You give it a URL, it scrapes the tutorial, turns every instruction into an executable step, then runs those steps exactly as a developer would — installing packages, writing files, running commands, making HTTP calls, and asserting results.
+AI Tutorial Validator is an AI-powered tool that checks whether a software documentation tutorial actually works. You give it a URL, it scrapes the tutorial, turns every instruction into an executable step, then runs those steps exactly as a developer would — installing packages, writing files, running commands, making HTTP calls, and asserting results.
 
 We originally built it internally to validate [ABP Framework](https://abp.io) tutorials, and then decided to publish it as open source so you can use it to validate any publicly accessible tutorial.
 
@@ -46,7 +46,7 @@ Docker mode runs the tutorial execution inside an isolated container, so nothing
 **Step 1 — Clone the repository**
 
 ```bash
-git clone https://github.com/AbpFramework/TutorialValidator.git
+git clone https://github.com/abpframework/tutorial-validator.git
 cd TutorialValidator
 ```
 
