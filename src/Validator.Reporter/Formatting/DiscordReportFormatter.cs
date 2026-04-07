@@ -15,19 +15,7 @@ public class DiscordReportFormatter
     private const int ColorRed = 0xCC0000;
 
     // Discord limits
-    private const int MaxEmbedDescriptionLength = 4096;
     private const int MaxFieldValueLength = 1024;
-    private const int MaxTotalEmbedLength = 6000;
-
-    // Step status icons
-    private static readonly Dictionary<StepExecutionStatus, string> StepIcons = new()
-    {
-        [StepExecutionStatus.Success] = "✅",
-        [StepExecutionStatus.Failed]  = "❌",
-        [StepExecutionStatus.Skipped] = "⏭️",
-        [StepExecutionStatus.Pending] = "⏳",
-        [StepExecutionStatus.Running] = "🔄"
-    };
 
     /// <summary>
     /// Converts a ValidationReport to a DiscordMessage with rich embeds.
@@ -150,31 +138,6 @@ public class DiscordReportFormatter
         AppendSectionMessages(messages, BuildDiagnosticsChunks(report), "Failure Diagnostics", color, report.GeneratedAt);
 
         return messages;
-    }
-
-    private static List<string> BuildStepsChunks(ValidationReport report)
-    {
-        if (report.Result.StepResults.Count == 0)
-        {
-            return [];
-        }
-
-        var lines = new List<string>();
-
-        foreach (var step in report.Result.StepResults)
-        {
-            var icon = StepIcons.TryGetValue(step.Status, out var i) ? i : "•";
-            var line = $"{icon} Step {step.StepId}: {step.StepType}";
-
-            if (step.Status == StepExecutionStatus.Failed && !string.IsNullOrWhiteSpace(step.ErrorMessage))
-            {
-                line += $" — `{step.ErrorMessage.Trim()}`";
-            }
-
-            lines.Add(line);
-        }
-
-        return BuildFieldChunks(lines);
     }
 
     private static List<string> BuildDiagnosticsChunks(ValidationReport report)
