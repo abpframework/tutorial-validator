@@ -52,6 +52,27 @@ public static class ExecutorPrompts
         automatically. Apply this for every C# file you write or modify.
         """;
 
+    /// <summary>
+    /// Aligns shell <c>workingDirectory</c> with how the .NET CLI resolves relative paths in arguments.
+    /// </summary>
+    private const string DotNetCliWorkingDirectoryRules = """
+        Determine the correct `workingDirectory` for the command after listing the workspace and locating the project directory.
+
+        IMPORTANT — for `dotnet` commands (`dotnet run`, `dotnet ef`, `dotnet build`, etc.):
+        - Paths passed to `--project`, `--startup-project`, and similar arguments are resolved relative
+          to the process working directory.
+        - If the command uses a path like `src/...` or `../...`, use the solution/repository root as
+          the `workingDirectory` so that relative path stays valid.
+        - If the command uses only a `.csproj` file name, use the folder that contains that `.csproj`.
+        - If there is no `--project` and the command is solution-wide, use the solution/repository root.
+        - For `dotnet ef` commands with multiple project-related flags, choose the directory from which
+          all relative paths in the command are valid.
+        - Do NOT set `workingDirectory` to a project subfolder while the command still uses
+          `--project src/.../SomeProject.csproj`.
+
+        For non-`dotnet` commands, choose the working directory appropriate to that tool and the step.
+        """;
+
     private const string SeniorSideEffectRules = """
         CRITICAL RULES TO AVOID SIDE EFFECTS:
         
@@ -102,6 +123,8 @@ public static class ExecutorPrompts
         
         1. EXECUTE LITERALLY: Do exactly what the step says. Do not add, modify, skip, or infer anything.
            - If a command is given, run exactly that command - don't add flags or change it.
+           - Choosing the correct `workingDirectory` so the command's relative paths resolve as intended
+             does NOT count as modifying the command.
            - If code is given, write it exactly as provided — but your IDE will auto-add missing
              `using` statements for any types referenced in the code (see USING STATEMENT AUTO-IMPORT below).
         
@@ -155,6 +178,8 @@ public static class ExecutorPrompts
         
         1. EXECUTE LITERALLY: Do exactly what the step says. Do not add, modify, skip, or infer anything.
            - If a command is given, run exactly that command - don't add flags or change it.
+           - Choosing the correct `workingDirectory` so the command's relative paths resolve as intended
+             does NOT count as modifying the command.
         
         2. NO PROBLEM SOLVING: If something fails, STOP and report the failure.
            - Do NOT try to fix the error.
@@ -344,12 +369,7 @@ public static class ExecutorPrompts
                 
                 Instructions:
                 1. First, list the workspace directory to explore and identify the project directory
-                2. Determine the correct working directory for this command based on what you find.
-                   IMPORTANT — for `dotnet` commands (dotnet run, dotnet ef, dotnet build, etc.):
-                   The working directory MUST be the folder that contains the .csproj file, NOT the
-                   solution root folder. Solution roots contain .sln/.slnx files but NOT a .csproj.
-                   If the project directory you found contains only solution files, list its
-                   subdirectories to find the one with a .csproj file and use THAT as the working directory.
+                2. {DotNetCliWorkingDirectoryRules}
                 3. Start the process using the StartBackgroundProcessAsync function (NOT ExecuteCommandAsync):
                    - command: {command}
                    - workingDirectory: the appropriate directory you discovered
@@ -373,12 +393,7 @@ public static class ExecutorPrompts
             
             Instructions:
             1. First, list the workspace directory to explore and identify the project directory
-            2. Determine the correct working directory for this command based on what you find.
-               IMPORTANT — for `dotnet` commands (dotnet run, dotnet ef, dotnet build, etc.):
-               The working directory MUST be the folder that contains the .csproj file, NOT the
-               solution root folder. Solution roots contain .sln/.slnx files but NOT a .csproj.
-               If the project directory you found contains only solution files, list its
-               subdirectories to find the one with a .csproj file and use THAT as the working directory.
+            2. {DotNetCliWorkingDirectoryRules}
             3. Execute the command:
                - command: {command}
                - workingDirectory: the appropriate directory you discovered

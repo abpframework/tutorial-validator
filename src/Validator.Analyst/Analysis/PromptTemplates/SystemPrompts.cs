@@ -210,6 +210,9 @@ public static class SystemPrompts
         }
         ```
 
+        In `command` fields, paths starting with `src/` are relative to the repository or solution root
+        (the folder that contains the solution file and the `src` directory), not the workspace root.
+
         ### CommandStep
         ```json
         {
